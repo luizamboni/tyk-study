@@ -1,0 +1,79 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  upstream:
+    image: kennethreitz/httpbin:latest
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./oauth/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro
+
+  protected-api:
+    image: node:22-alpine
+    command: node /app/server.mjs
+    environment:
+      PORT: 3000
+      OAUTH_ISSUER: http://keycloak:8080/realms/tyk-demo
+      OAUTH_CLIENT_ID: tyk-broker
+    depends_on:
+      keycloak:
+        condition: service_started
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./oauth/protected-api/server.mjs:/app/server.mjs:ro
+
+  token-broker:
+    image: node:22-alpine
+    command: node /app/server.mjs
+    environment:
+      PORT: 3000
+      TOKEN_URL: http://keycloak:8080/realms/tyk-demo/protocol/openid-connect/token
+      CLIENT_ID: tyk-broker
+      CLIENT_SECRET: broker-secret
+      UPSTREAM_URL: http://protected-api:3000
+    depends_on:
+      keycloak:
+        condition: service_started
+      protected-api:
+        condition: service_started
+    volumes:
+      - ./oauth/token-broker/server.mjs:/app/server.mjs:ro
+
+  tyk:
+    image: tykio/tyk-gateway:v5.8.5
+    depends_on:
+      redis:
+        condition: service_healthy
+      upstream:
+        condition: service_started
+      token-broker:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    environment:
+      TYK_SECRET_UPSTREAM_QUERY_API_KEY: ${UPSTREAM_QUERY_API_KEY:-query-secret-demo}
+      TYK_SECRET_UPSTREAM_HEADER_API_KEY: ${UPSTREAM_HEADER_API_KEY:-header-secret-demo}
+    volumes:
+      - ./tyk/tyk.conf:/opt/tyk-gateway/tyk.conf:ro
+      # Gravável para permitir que a Gateway API persista definições criadas via REST.
+      - ./tyk/apps:/opt/tyk-gateway/apps
+
+volumes:
+  redis-data:

@@ -1,0 +1,24 @@
+{
+  "name": "API criada dinamicamente",
+  "api_id": "dynamic-api",
+  "org_id": "demo-org",
+  "use_keyless": true,
+  "active": true,
+  "proxy": {
+    "listen_path": "/dynamic/",
+    "target_url": "http://upstream/",
+    "strip_listen_path": true
+  },
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true,
+        "global_headers": {
+          "X-Config-Version": "v1"
+        }
+      }
+    }
+  }
+}
