@@ -57,7 +57,7 @@ health: ## Verifica a saúde do Gateway
 	@echo "Requisição: GET $(TYK_URL)/hello"
 	@echo "A resposta abaixo identifica a versão e confirma que o Gateway está ativo:"
 	@echo
-	@curl --fail --silent --show-error "$(TYK_URL)/hello"; echo
+	@curl --fail --silent --show-error "$(TYK_URL)/hello" | jq '.'; echo
 
 proxy: ## Demonstra proxy reverso sem autenticação
 	@echo "=== Exemplo 1: proxy reverso sem autenticação ==="
@@ -67,7 +67,7 @@ proxy: ## Demonstra proxy reverso sem autenticação
 	@echo "Resultado esperado: HTTP 200 com o JSON produzido pelo HTTPBin."
 	@echo
 	@echo "Resposta do upstream recebida através do Tyk:"
-	@curl --fail --silent --show-error "$(TYK_URL)/public/get?example=proxy"; echo
+	@curl --fail --silent --show-error "$(TYK_URL)/public/get?example=proxy" | jq '.'; echo
 
 auth-denied: ## Demonstra a rejeição de uma chamada sem token
 	@echo "=== Exemplo 2: acesso sem token ==="
@@ -88,7 +88,7 @@ create-key: ## Cria uma chave de acesso para a API protegida
 	  --header "x-tyk-authorization: $(TYK_SECRET)" \
 	  --header "Content-Type: application/json" \
 	  --request POST "$(TYK_URL)/tyk/keys/$(DEMO_KEY)" \
-	  --data '{"alias":"Cliente demo","org_id":"demo-org","rate":100,"per":60,"quota_max":-1,"meta_data":{"tenant_id":"tenant-a"},"access_rights":{"protected-api":{"api_id":"protected-api","api_name":"API protegida por token","versions":["Default"]},"upstream-query-api":{"api_id":"upstream-query-api","api_name":"Upstream autenticado por query string","versions":["Default"]},"upstream-header-api":{"api_id":"upstream-header-api","api_name":"Upstream autenticado por cabecalho","versions":["Default"]},"oauth-broker-api":{"api_id":"oauth-broker-api","api_name":"Integrações via plugin Go","versions":["Default"]}}}' && echo
+	  --data '{"alias":"Cliente demo","org_id":"demo-org","rate":100,"per":60,"quota_max":-1,"meta_data":{"tenant_id":"tenant-a"},"access_rights":{"protected-api":{"api_id":"protected-api","api_name":"API protegida por token","versions":["Default"]},"upstream-query-api":{"api_id":"upstream-query-api","api_name":"Upstream autenticado por query string","versions":["Default"]},"upstream-header-api":{"api_id":"upstream-header-api","api_name":"Upstream autenticado por cabecalho","versions":["Default"]},"oauth-broker-api":{"api_id":"oauth-broker-api","api_name":"Integrações via plugin Go","versions":["Default"]}}}' | jq '.' && echo
 
 auth: create-key ## Chama a API protegida usando a chave criada
 	@echo
@@ -98,7 +98,7 @@ auth: create-key ## Chama a API protegida usando a chave criada
 	@echo "Resultado esperado: o Tyk valida a chave e encaminha a chamada ao HTTPBin."
 	@echo
 	@echo "Resposta do upstream recebida através do Tyk:"
-	@curl --fail --silent --show-error --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/protected/get?example=auth" && echo
+	@curl --fail --silent --show-error --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/protected/get?example=auth" | jq '.' && echo
 
 rate-limit: ## Faz 5 chamadas; após 3, o Gateway deve responder 429
 	@echo "=== Exemplo 4: limite global de requisições ==="
@@ -124,13 +124,13 @@ upstream-credentials: create-key ## Usa uma chave Tyk em APIs com credenciais up
 	@echo "O Tyk remove a chave do cliente e inclui api_key na query string do upstream."
 	@echo "O campo args da resposta permite observar a credencial recebida pelo HTTPBin:"
 	@curl --fail --silent --show-error --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/services/query-auth/anything" && echo
+	  "$(TYK_URL)/services/query-auth/anything" | jq '.' && echo
 	@echo
 	@echo "API B: $(TYK_URL)/services/header-auth/anything"
 	@echo "O Tyk remove a chave do cliente e inclui X-Upstream-Api-Key no upstream."
 	@echo "O campo headers permite observar a credencial recebida pelo HTTPBin:"
 	@curl --fail --silent --show-error --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/services/header-auth/anything" && echo
+	  "$(TYK_URL)/services/header-auth/anything" | jq '.' && echo
 	@echo
 	@echo "Conclusão: o cliente usou a mesma chave nas duas chamadas; cada API aplicou sua própria credencial."
 
@@ -159,9 +159,9 @@ oauth-upstream: create-key oauth-direct-denied ## Demonstra Tyk, broker, Keycloa
 	@echo "4. O plugin chama diretamente a API externa com Bearer token."
 	@echo "5. A API valida assinatura, issuer, expiração e client_id pelo JWKS."
 	@echo
-	@curl --fail --silent --show-error --include \
+	@curl --fail --silent --show-error \
 	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/integrations/oauth/resource" && echo
+	  "$(TYK_URL)/integrations/oauth/resource" | jq '.' && echo
 
 oauth-token-cache: create-key ## Mostra obtenção e reutilização do access token
 	@$(MAKE) --no-print-directory oauth-ready
@@ -194,7 +194,7 @@ reload: ## Recarrega as APIs sem reiniciar o Gateway
 	@echo
 	@curl --fail --silent --show-error \
 	  --header "x-tyk-authorization: $(TYK_SECRET)" \
-	  "$(TYK_URL)/tyk/reload/group" && echo
+	  "$(TYK_URL)/tyk/reload/group" | jq '.' && echo
 	@sleep 2
 	@echo "Reload aplicado; as novas rotas já podem receber tráfego."
 
@@ -202,7 +202,7 @@ list-apis: ## Lista as APIs conhecidas pelo Gateway
 	@echo "=== APIs carregadas no Gateway ==="
 	@curl --fail --silent --show-error \
 	  --header "x-tyk-authorization: $(TYK_SECRET)" \
-	  "$(TYK_URL)/tyk/apis" && echo
+	  "$(TYK_URL)/tyk/apis" | jq '.' && echo
 
 deploy-dynamic: ## Cria uma API via REST e aplica hot reload
 	@echo "=== Criação dinâmica: versão v1 ==="
@@ -211,7 +211,7 @@ deploy-dynamic: ## Cria uma API via REST e aplica hot reload
 	  --header "x-tyk-authorization: $(TYK_SECRET)" \
 	  --header "Content-Type: application/json" \
 	  --request POST "$(TYK_URL)/tyk/apis/dynamic-api" \
-	  --data @examples/dynamic-api-v1.json && echo
+	  --data @examples/dynamic-api-v1.json | jq '.' && echo
 	@$(MAKE) --no-print-directory reload
 
 update-dynamic: ## Atualiza a API via REST para a versão v2
@@ -221,19 +221,19 @@ update-dynamic: ## Atualiza a API via REST para a versão v2
 	  --header "x-tyk-authorization: $(TYK_SECRET)" \
 	  --header "Content-Type: application/json" \
 	  --request POST "$(TYK_URL)/tyk/apis/dynamic-api" \
-	  --data @examples/dynamic-api-v2.json && echo
+	  --data @examples/dynamic-api-v2.json | jq '.' && echo
 	@$(MAKE) --no-print-directory reload
 
 call-dynamic: ## Chama a API dinâmica e mostra a configuração aplicada
 	@echo "=== Chamada à API dinâmica ==="
 	@echo "Observe X-Config-Version e X-New-Behavior nos headers recebidos pelo HTTPBin:"
-	@curl --fail --silent --show-error "$(TYK_URL)/dynamic/anything" && echo
+	@curl --fail --silent --show-error "$(TYK_URL)/dynamic/anything" | jq '.' && echo
 
 delete-dynamic: ## Exclui a API dinâmica e aplica hot reload
 	@echo "=== Exclusão dinâmica ==="
 	@curl --fail --silent --show-error \
 	  --header "x-tyk-authorization: $(TYK_SECRET)" \
-	  --request DELETE "$(TYK_URL)/tyk/apis/dynamic-api" && echo
+	  --request DELETE "$(TYK_URL)/tyk/apis/dynamic-api" | jq '.' && echo
 	@$(MAKE) --no-print-directory reload
 
 hot-reload-demo: ## Demonstra criação e atualização on the fly
