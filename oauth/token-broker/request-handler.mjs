@@ -18,7 +18,8 @@ function findOperation(tenant, integrationName, operationName, method) {
   return {
     target_url: integration.target_url,
     operation_path: operation.path || "/",
-    auth_type: operation.auth_type,
+    auth_type: integration.auth?.type,
+    ...integration.auth,
     ...operation
   };
 }

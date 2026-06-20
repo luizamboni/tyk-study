@@ -5,9 +5,9 @@ integracoes, onde cada integracao tem seu propio upstream e
 metodo de autenticacao, com resolucao centralizada de credenciais.
 
 ```
-Cliente -> chave Tyk -> Tyk + plugin Go -> credential broker -> upstream (httpbin)
+Cliente -> chave Tyk -> Tyk + plugin Go -> credential broker -> upstream (echo server)
                                                               -> Keycloak -> protected-api
-                                                              -> upstream (httpbin)
+                                                              -> upstream (echo server)
 ```
 
 O **credential broker** é o ponto único de resolucao de autenticacao:
@@ -37,11 +37,11 @@ Todas as requisicoes passam por uma unica API definition no Tyk:
 /api/integration/{integracao}/operation/{operacao}
 ```
 
-| Integracao | Operacao | Autenticacao | Upstream |
+| Integracao | Operacao | Autenticacao | Rota upstream |
 |---|---|---|---|
-| `construcao` | `consultar-certidao` | API key (`X-Api-Key`) | httpbin |
-| `educacao` | `emitir-historico` | Bearer token (broker -> Keycloak) | protected-api |
-| `saude` | `agendar-consulta` | Basic Auth | httpbin |
+| `construcao` | `consultar-certidao` | API key (`X-Api-Key`) | `GET /api/construcao/v1/certidoes/123` |
+| `educacao` | `emitir-historico` | Bearer token (broker -> Keycloak) | `GET /api/educacao/v1/historico` |
+| `saude` | `agendar-consulta` | Basic Auth | `POST /api/saude/v1/consultas` |
 
 ## Comandos
 
@@ -67,9 +67,9 @@ Todas as requisicoes passam por uma unica API definition no Tyk:
 | Comando | Exemplo pratico |
 |---|---|
 | `make create-key` | Cria chave de acesso no Tyk |
-| `make integration-construcao` | Construcao: consultar certidao com API key |
-| `make integration-educacao` | Educacao: emitir historico escolar via OAuth2 |
-| `make integration-saude` | Saude: agendar consulta com Basic Auth |
+| `make integration-construcao` | `GET /api/construcao/v1/certidoes/123` via API key |
+| `make integration-educacao` | `GET /api/educacao/v1/historico` via OAuth2 |
+| `make integration-saude` | `POST /api/saude/v1/consultas` via Basic Auth |
 | `make cache-educacao` | Mostra o cache do access token (educacao) |
 | `make denied-educacao` | Mostra o broker rejeitando operacao inexistente |
 | `make oauth-direct-denied` | Mostra que a API protegida rejeita chamadas sem token |
@@ -119,14 +119,17 @@ Servico Node.js que centraliza toda configuracao de integracoes:
   "tenants": {
     "tenant-a": {
       "integrations": {
-        "httpbin": {
-          "target_url": "http://upstream",
+        "construcao": {
+          "target_url": "http://upstream:3000",
+          "auth": {
+            "type": "api-key",
+            "header_name": "X-Api-Key",
+            "header_value": "demo-httpbin-key"
+          },
           "operations": {
-            "get": {
-              "auth_type": "api-key",
-              "path": "/get",
-              "header_name": "X-Api-Key",
-              "header_value": "demo-httpbin-key"
+            "consultar-certidao": {
+              "path": "/api/construcao/v1/certidoes/123",
+              "method": "GET"
             }
           }
         }

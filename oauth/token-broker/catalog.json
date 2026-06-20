@@ -10,37 +10,43 @@
     "tenant-a": {
       "integrations": {
         "construcao": {
-          "target_url": "http://upstream",
+          "target_url": "http://upstream:3000",
+          "auth": {
+            "type": "api-key",
+            "header_name": "X-Api-Key",
+            "header_value": "demo-httpbin-key"
+          },
           "operations": {
             "consultar-certidao": {
-              "auth_type": "api-key",
-              "path": "/get",
-              "method": "GET",
-              "header_name": "X-Api-Key",
-              "header_value": "demo-httpbin-key"
+              "path": "/api/construcao/v1/certidoes/123",
+              "method": "GET"
             }
           }
         },
         "educacao": {
           "target_url": "http://protected-api:3000",
+          "auth": {
+            "type": "bearer",
+            "oauth_provider": "keycloak-tyk-demo"
+          },
           "operations": {
             "emitir-historico": {
-              "auth_type": "bearer",
-              "path": "/resource",
-              "method": "GET",
-              "oauth_provider": "keycloak-tyk-demo"
+              "path": "/api/educacao/v1/historico",
+              "method": "GET"
             }
           }
         },
         "saude": {
-          "target_url": "http://upstream",
+          "target_url": "http://upstream:3000",
+          "auth": {
+            "type": "basic",
+            "username": "demo-echo",
+            "password": "demo-echo-pass"
+          },
           "operations": {
             "agendar-consulta": {
-              "auth_type": "basic",
-              "path": "/headers",
-              "method": "GET",
-              "username": "demo-echo",
-              "password": "demo-echo-pass"
+              "path": "/api/saude/v1/consultas",
+              "method": "POST"
             }
           }
         }

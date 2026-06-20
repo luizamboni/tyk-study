@@ -11,7 +11,10 @@ services:
       retries: 15
 
   upstream:
-    image: kennethreitz/httpbin:latest
+    image: node:22-alpine
+    command: node /app/server.mjs
+    volumes:
+      - ./upstream:/app:ro
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.3

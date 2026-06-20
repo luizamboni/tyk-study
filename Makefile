@@ -90,7 +90,7 @@ integration-construcao: create-key ## construcao: certidao com API key
 	@echo
 	@curl --fail --silent --show-error \
 	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/construcao/operation/consultar-certidao" | jq '.url, .headers."X-Api-Key"' && echo
+	  "$(TYK_URL)/api/integration/construcao/operation/consultar-certidao" | jq '.path, .headers["x-api-key"]' && echo
 
 integration-educacao: create-key oauth-direct-denied ## educacao: historico escolar protegido por OAuth2
 	@$(MAKE) --no-print-directory oauth-ready
@@ -104,13 +104,13 @@ integration-educacao: create-key oauth-direct-denied ## educacao: historico esco
 	  --header "Authorization: $(CLIENT_KEY)" \
 	  "$(TYK_URL)/api/integration/educacao/operation/emitir-historico" | jq '.' && echo
 
-integration-saude: create-key ## saude: consulta medica com Basic Auth
+integration-saude: create-key ## saude: POST /api/saude/v1/consultas com Basic Auth
 	@echo "=== saude (Basic Auth) ==="
 	@echo "Autenticacao: Basic Auth injetado pelo plugin Go"
 	@echo
-	@curl --fail --silent --show-error \
+	@curl --fail --silent --show-error -X POST \
 	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/saude/operation/agendar-consulta" | jq '.headers.Authorization' && echo
+	  "$(TYK_URL)/api/integration/saude/operation/agendar-consulta" | jq '.method, .path, .headers.authorization' && echo
 
 cache-educacao: create-key ## Mostra cache do access token (educacao)
 	@$(MAKE) --no-print-directory oauth-ready
