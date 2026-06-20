@@ -70,10 +70,13 @@ services:
     environment:
       TYK_SECRET_UPSTREAM_QUERY_API_KEY: ${UPSTREAM_QUERY_API_KEY:-query-secret-demo}
       TYK_SECRET_UPSTREAM_HEADER_API_KEY: ${UPSTREAM_HEADER_API_KEY:-header-secret-demo}
+      TOKEN_BROKER_URL: http://token-broker:3000
+      TOKEN_BROKER_INTERNAL_TOKEN: broker-internal-demo
     volumes:
       - ./tyk/tyk.conf:/opt/tyk-gateway/tyk.conf:ro
       # Gravável para permitir que a Gateway API persista definições criadas via REST.
       - ./tyk/apps:/opt/tyk-gateway/apps
+      - ./tyk/middleware:/opt/tyk-gateway/middleware:ro
 
 volumes:
   redis-data:

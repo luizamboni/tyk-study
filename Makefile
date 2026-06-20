@@ -7,7 +7,7 @@ DEMO_KEY ?= demo-client-key
 CLIENT_KEY := demo-org$(DEMO_KEY)
 COMPOSE := docker compose
 
-.PHONY: help check up down reset logs ps health proxy auth-denied create-key auth rate-limit upstream-credentials oauth-ready oauth-upstream oauth-direct-denied oauth-token-cache reload list-apis deploy-dynamic update-dynamic call-dynamic delete-dynamic hot-reload-demo demo
+.PHONY: help check plugin-check plugin-build up down reset logs ps health proxy auth-denied create-key auth rate-limit upstream-credentials oauth-ready oauth-upstream oauth-direct-denied oauth-token-cache plugin-denied reload list-apis deploy-dynamic update-dynamic call-dynamic delete-dynamic hot-reload-demo demo
 
 help: ## Lista os comandos disponíveis
 	@awk 'BEGIN {FS = ":.*## "; printf "Uso: make <alvo>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -18,7 +18,21 @@ check: ## Valida a configuração do Docker Compose
 	@$(COMPOSE) config --quiet
 	@echo "Configuração válida."
 
-up: check ## Inicia Redis, upstream e Tyk
+plugin-check: ## Verifica se o plugin Go está compilado
+	@test -f tyk/middleware/IntegrationBroker_v5.8.5_linux_arm64.so || $(MAKE) --no-print-directory plugin-build
+
+plugin-build: ## Compila o plugin Go para Tyk 5.8.5 linux/arm64
+	@echo "Compilando plugin Go com o compilador oficial do Tyk..."
+	@rm -f plugin/IntegrationBroker_v5.8.5_linux_arm64.so
+	@docker run --rm --platform=linux/amd64 \
+	  --volume "$(CURDIR)/plugin:/plugin-source" \
+	  tykio/tyk-plugin-compiler:v5.8.5 \
+	  IntegrationBroker.so build-$$(date +%s) linux arm64
+	@mkdir -p tyk/middleware
+	@mv plugin/IntegrationBroker_v5.8.5_linux_arm64.so tyk/middleware/
+	@echo "Plugin criado em tyk/middleware/IntegrationBroker_v5.8.5_linux_arm64.so"
+
+up: check plugin-check ## Inicia Redis, upstream e Tyk
 	@$(COMPOSE) up -d --wait
 	@attempt=1; until curl --fail --silent "$(TYK_URL)/hello" >/dev/null; do \
 	  [ $$attempt -ge 20 ] && { echo "Tyk não ficou disponível a tempo"; $(COMPOSE) logs tyk; exit 1; }; \

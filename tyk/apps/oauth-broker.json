@@ -1,18 +1,31 @@
 {
-  "name": "API externa OAuth via token broker",
+  "name": "Integrações via plugin Go",
   "api_id": "oauth-broker-api",
   "org_id": "demo-org",
   "use_keyless": false,
-  "strip_auth_data": true,
+  "strip_auth_data": false,
   "auth": { "auth_header_name": "Authorization" },
   "auth_configs": {
     "authToken": { "auth_header_name": "Authorization" }
   },
   "active": true,
   "proxy": {
-    "listen_path": "/services/oauth/",
-    "target_url": "http://token-broker:3000/",
-    "strip_listen_path": true
+    "listen_path": "/integrations/",
+    "target_url": "http://protected-api:3000/",
+    "strip_listen_path": false
+  },
+  "custom_middleware": {
+    "pre": [],
+    "post_key_auth": [
+      {
+        "name": "RouteIntegration",
+        "path": "/opt/tyk-gateway/middleware/IntegrationBroker_v5.8.5_linux_arm64.so",
+        "require_session": true,
+        "raw_body_only": false
+      }
+    ],
+    "post": [],
+    "driver": "goplugin"
   },
   "version_data": {
     "not_versioned": true,
