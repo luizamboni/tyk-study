@@ -2,7 +2,7 @@ import { createServer } from "http";
 
 const port = Number(process.env.PORT || 3000);
 
-function gerarPdfBase64(dados) {
+function gerarPdfBase64(dados, tamanhoMB = 0) {
   const streamContent =
     "BT /F1 10 Tf\n" +
     "50 780 Td (SECRETARIA MUNICIPAL DE SAUDE) Tj\n" +
@@ -23,6 +23,25 @@ function gerarPdfBase64(dados) {
   const obj5 = Buffer.from("5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n", "latin1");
 
   const parts = [header, obj1, obj2, obj3, obj4Head, streamBytes, obj4Tail, obj5];
+  let numObjects = 6;
+
+  if (tamanhoMB > 0) {
+    const targetBytes = tamanhoMB * 1024 * 1024;
+    const baseSize = parts.reduce((s, p) => s + p.length, 0);
+    const xrefOverhead = 120;
+    const padNeeded = Math.max(0, targetBytes - baseSize - xrefOverhead);
+    if (padNeeded > 50) {
+      const padStream = Buffer.alloc(padNeeded, 48); // '0' bytes
+      const obj6 = Buffer.concat([
+        Buffer.from("6 0 obj<</Length " + padNeeded + ">>stream\n", "latin1"),
+        padStream,
+        Buffer.from("\nendstream\nendobj\n", "latin1"),
+      ]);
+      parts.push(obj6);
+      numObjects = 7;
+    }
+  }
+
   const offsets = [];
   let pos = 0;
   for (const p of parts) {
@@ -31,22 +50,29 @@ function gerarPdfBase64(dados) {
   }
   const xrefOffset = pos;
 
+  const xrefEntries = [
+    "0000000000 65535 f \n",
+    String(offsets[1]).padStart(10, "0") + " 00000 n \n",
+    String(offsets[2]).padStart(10, "0") + " 00000 n \n",
+    String(offsets[3]).padStart(10, "0") + " 00000 n \n",
+    String(offsets[4]).padStart(10, "0") + " 00000 n \n",
+    String(offsets[7]).padStart(10, "0") + " 00000 n \n",
+  ];
+  if (numObjects > 6) {
+    xrefEntries.push(String(offsets[8]).padStart(10, "0") + " 00000 n \n");
+  }
+
   const xref =
-    "xref\n0 6\n" +
-    "0000000000 65535 f \n" +
-    String(offsets[1]).padStart(10, "0") + " 00000 n \n" +
-    String(offsets[2]).padStart(10, "0") + " 00000 n \n" +
-    String(offsets[3]).padStart(10, "0") + " 00000 n \n" +
-    String(offsets[4]).padStart(10, "0") + " 00000 n \n" +
-    String(offsets[7]).padStart(10, "0") + " 00000 n \n" +
-    "trailer\n<</Size 6/Root 1 0 R>>\n" +
+    "xref\n0 " + numObjects + "\n" +
+    xrefEntries.join("") +
+    "trailer\n<</Size " + numObjects + "/Root 1 0 R>>\n" +
     "startxref\n" + xrefOffset + "\n%%EOF";
 
   const buf = Buffer.concat([...parts, Buffer.from(xref, "latin1")]);
   return buf.toString("base64");
 }
 
-function consultaResponse() {
+function consultaResponse(tamanhoMB = 0) {
   const dados = {
     protocolo: "CNS-20260620-0042",
     paciente: "Joao Santos",
@@ -54,10 +80,11 @@ function consultaResponse() {
     data: "25/06/2026 as 14:30",
     status: "Confirmada"
   };
+  const suffixo = tamanhoMB > 0 ? "-" + tamanhoMB + "mb" : "";
   return {
-    filename: "consulta.pdf",
+    filename: "consulta" + suffixo + ".pdf",
     content_type: "application/pdf",
-    content: gerarPdfBase64(dados),
+    content: gerarPdfBase64(dados, tamanhoMB),
     metadata: dados
   };
 }
@@ -79,7 +106,9 @@ function certidaoResponse() {
 }
 
 const server = createServer((request, response) => {
-  const path = new URL(request.url, `http://${request.headers.host}`).pathname;
+  const url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
+  const path = url.pathname;
+  const tamanho = Math.max(0, parseInt(url.searchParams.get("tamanho") || "0", 10));
 
   if (path.startsWith("/api/construcao/")) {
     response.writeHead(200, { "content-type": "application/xml" });
@@ -89,7 +118,7 @@ const server = createServer((request, response) => {
 
   if (path.startsWith("/api/saude/")) {
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify(consultaResponse()));
+    response.end(JSON.stringify(consultaResponse(tamanho)));
     return;
   }
 

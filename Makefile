@@ -88,9 +88,11 @@ integration-construcao: create-key ## construcao: certidao com API key
 	@echo "=== construcao (API key) ==="
 	@echo "Autenticacao: X-Api-Key injetado pelo plugin Go"
 	@echo
-	@curl --fail --silent --show-error \
-	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/construcao/operation/consultar-certidao" | jq '.path, .headers["x-api-key"]' && echo
+	@t=$$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000'); \
+	 curl --fail --silent --show-error \
+	   --header "Authorization: $(CLIENT_KEY)" \
+	   "$(TYK_URL)/api/integration/construcao/operation/consultar-certidao" | python3 scripts/pretty_xml.py; \
+	 echo "Duração: $$(($$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000')-t)) ms"
 
 integration-educacao: create-key oauth-direct-denied ## educacao: historico escolar protegido por OAuth2
 	@$(MAKE) --no-print-directory oauth-ready
@@ -100,17 +102,35 @@ integration-educacao: create-key oauth-direct-denied ## educacao: historico esco
 	@echo "URL: /api/integration/educacao/operation/emitir-historico"
 	@echo "Autenticacao: Bearer token obtido via broker -> Keycloak"
 	@echo
-	@curl --fail --silent --show-error \
-	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/educacao/operation/emitir-historico" | jq '.' && echo
+	@t=$$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000'); \
+	 curl --fail --silent --show-error \
+	   --header "Authorization: $(CLIENT_KEY)" \
+	   "$(TYK_URL)/api/integration/educacao/operation/emitir-historico" | jq '.'; \
+	 echo "Duração: $$(($$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000')-t)) ms"; echo
 
-integration-saude: create-key ## saude: POST /api/saude/v1/consultas com Basic Auth
+integration-saude: create-key ## saude: POST agendar-consulta com Basic Auth (PDF)
 	@echo "=== saude (Basic Auth) ==="
 	@echo "Autenticacao: Basic Auth injetado pelo plugin Go"
 	@echo
-	@curl --fail --silent --show-error -X POST \
-	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/saude/operation/agendar-consulta" | jq '.method, .path, .headers.authorization' && echo
+	@t=$$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000'); \
+	 curl --fail --silent --show-error -X POST \
+	   --header "Authorization: $(CLIENT_KEY)" \
+	   "$(TYK_URL)/api/integration/saude/operation/agendar-consulta" \
+	   -o /tmp/saude-default.pdf && \
+	 ls -lh /tmp/saude-default.pdf | awk '{print "PDF salvo:", $$NF " (" $$5 ")"}'; \
+	 echo "Duração: $$(($$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000')-t)) ms"; echo
+
+PDF_TAMANHO ?= 1
+
+integration-saude-pdf: create-key ## saude: gera PDF de N MB (ex: make PDF_TAMANHO=10 integration-saude-pdf)
+	@echo "=== saude (Basic Auth) — PDF de $(PDF_TAMANHO) MB ==="
+	@t=$$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000'); \
+	 curl --fail --silent --show-error -X POST \
+	   --header "Authorization: $(CLIENT_KEY)" \
+	   "$(TYK_URL)/api/integration/saude/operation/agendar-consulta?tamanho=$(PDF_TAMANHO)" \
+	   -o /tmp/consulta-$(PDF_TAMANHO)mb.pdf && \
+	 ls -lh /tmp/consulta-$(PDF_TAMANHO)mb.pdf | awk '{print "Salvo:", $$NF, "(" $$5 ")"}'; \
+	 echo "Duração: $$(($$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000')-t)) ms"
 
 cache-educacao: create-key ## Mostra cache do access token (educacao)
 	@$(MAKE) --no-print-directory oauth-ready
@@ -122,18 +142,22 @@ cache-educacao: create-key ## Mostra cache do access token (educacao)
 	@echo
 	@i=1; while [ $$i -le 2 ]; do \
 	  echo "Chamada $$i:"; \
+	  t=$$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000'); \
 	  curl --fail --silent --show-error \
 	    --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/educacao/operation/emitir-historico" \
 	    | jq '{ message, received_headers: { x_broker_source: .received_headers["x-broker-source"] } }'; \
+	  echo "Duração: $$(($$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000')-t)) ms"; \
 	  echo; \
 	  i=$$((i + 1)); \
 	done
 
 denied-educacao: create-key ## Mostra o broker rejeitando operacao inexistente
 	@echo "=== Operacao inexistente ==="
-	@http_code=$$(curl --silent --output /dev/null --write-out '%{http_code}' \
-	  --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/educacao/operation/delete-all"); \
-	 test "$$http_code" = "502" && echo "Resultado: HTTP 502 — broker rejeitou (credential_not_found)." || { echo "Esperado 502, recebido $$http_code"; exit 1; }
+	@t=$$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000'); \
+	 http_code=$$(curl --silent --output /dev/null --write-out '%{http_code}' \
+	   --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/educacao/operation/delete-all"); \
+	 test "$$http_code" = "502" && echo "Resultado: HTTP 502 — broker rejeitou (credential_not_found)." || { echo "Esperado 502, recebido $$http_code"; exit 1; }; \
+	 echo "Duração: $$(($$(perl -MTime::HiRes -e 'printf "%.0f",Time::HiRes::time()*1000')-t)) ms"
 
 reload: ## Recarrega as APIs sem reiniciar o Gateway
 	@echo "=== Hot reload das APIs ==="
