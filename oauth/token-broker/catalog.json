@@ -9,10 +9,10 @@
   "tenants": {
     "tenant-a": {
       "integrations": {
-        "servico-a": {
+        "construcao": {
           "target_url": "http://upstream",
           "operations": {
-            "depurar-requisicao": {
+            "consultar-certidao": {
               "auth_type": "api-key",
               "path": "/get",
               "method": "GET",
@@ -21,10 +21,10 @@
             }
           }
         },
-        "servico-b": {
+        "educacao": {
           "target_url": "http://protected-api:3000",
           "operations": {
-            "acessar-recurso": {
+            "emitir-historico": {
               "auth_type": "bearer",
               "path": "/resource",
               "method": "GET",
@@ -32,10 +32,10 @@
             }
           }
         },
-        "servico-c": {
+        "saude": {
           "target_url": "http://upstream",
           "operations": {
-            "verificar-cabecalhos": {
+            "agendar-consulta": {
               "auth_type": "basic",
               "path": "/headers",
               "method": "GET",

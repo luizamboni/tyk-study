@@ -23,9 +23,9 @@ o tipo de auth + credenciais + target URL.
 
 ```sh
 make up
-make integration-servico-a
-make integration-servico-b
-make integration-servico-c
+make integration-construcao
+make integration-educacao
+make integration-saude
 make down
 ```
 
@@ -38,10 +38,10 @@ Todas as requisicoes passam por uma unica API definition no Tyk:
 ```
 
 | Integracao | Operacao | Autenticacao | Upstream |
-|---|---|---|---|---|
-| `servico-a` | `depurar-requisicao` | API key (`X-Api-Key`) | httpbin |
-| `servico-b` | `acessar-recurso` | Bearer token (broker -> Keycloak) | protected-api |
-| `servico-c` | `verificar-cabecalhos` | Basic Auth | httpbin |
+|---|---|---|---|
+| `construcao` | `consultar-certidao` | API key (`X-Api-Key`) | httpbin |
+| `educacao` | `emitir-historico` | Bearer token (broker -> Keycloak) | protected-api |
+| `saude` | `agendar-consulta` | Basic Auth | httpbin |
 
 ## Comandos
 
@@ -67,11 +67,11 @@ Todas as requisicoes passam por uma unica API definition no Tyk:
 | Comando | Exemplo pratico |
 |---|---|
 | `make create-key` | Cria chave de acesso no Tyk |
-| `make integration-servico-a` | servico-a: httpbin com API key |
-| `make integration-servico-b` | servico-b: OAuth2 completo (broker -> Keycloak -> JWT) |
-| `make integration-servico-c` | servico-c: httpbin com Basic Auth |
-| `make cache-servico-b` | Mostra o cache do access token no plugin Go |
-| `make denied-servico-b` | Mostra o broker rejeitando operacao inexistente |
+| `make integration-construcao` | Construcao: consultar certidao com API key |
+| `make integration-educacao` | Educacao: emitir historico escolar via OAuth2 |
+| `make integration-saude` | Saude: agendar consulta com Basic Auth |
+| `make cache-educacao` | Mostra o cache do access token (educacao) |
+| `make denied-educacao` | Mostra o broker rejeitando operacao inexistente |
 | `make oauth-direct-denied` | Mostra que a API protegida rejeita chamadas sem token |
 
 ### Administracao do Tyk
