@@ -9,29 +9,22 @@
   "tenants": {
     "tenant-a": {
       "integrations": {
-        "httpbin": {
+        "servico-a": {
           "target_url": "http://upstream",
           "operations": {
-            "get": {
+            "depurar-requisicao": {
               "auth_type": "api-key",
               "path": "/get",
               "method": "GET",
               "header_name": "X-Api-Key",
               "header_value": "demo-httpbin-key"
-            },
-            "post": {
-              "auth_type": "api-key",
-              "path": "/post",
-              "method": "POST",
-              "header_name": "X-Api-Key",
-              "header_value": "demo-httpbin-key"
             }
           }
         },
-        "oauth": {
+        "servico-b": {
           "target_url": "http://protected-api:3000",
           "operations": {
-            "resource": {
+            "acessar-recurso": {
               "auth_type": "bearer",
               "path": "/resource",
               "method": "GET",
@@ -39,10 +32,10 @@
             }
           }
         },
-        "echo": {
+        "servico-c": {
           "target_url": "http://upstream",
           "operations": {
-            "headers": {
+            "verificar-cabecalhos": {
               "auth_type": "basic",
               "path": "/headers",
               "method": "GET",

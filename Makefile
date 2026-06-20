@@ -7,7 +7,7 @@ DEMO_KEY ?= demo-client-key
 CLIENT_KEY := demo-org$(DEMO_KEY)
 COMPOSE := docker compose
 
-.PHONY: help check plugin-check plugin-build up down reset logs ps health create-key oauth-ready oauth-upstream oauth-direct-denied oauth-token-cache plugin-denied reload list-apis integration-httpbin integration-echo
+.PHONY: help check plugin-check plugin-build up down reset logs ps health create-key oauth-ready oauth-direct-denied reload list-apis integration-servico-a integration-servico-b integration-servico-c cache-servico-b denied-servico-b
 
 help: ## Lista os comandos disponiveis
 	@awk 'BEGIN {FS = ":.*## "; printf "Uso: make <alvo>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -84,19 +84,35 @@ oauth-ready: ## Aguarda o Keycloak concluir a importacao do realm
 	done
 	@echo "Keycloak pronto."
 
-oauth-upstream: create-key oauth-direct-denied ## Demonstra Tyk, broker, Keycloak e API OAuth
+integration-servico-a: create-key ## servico-a: httpbin com API key
+	@echo "=== servico-a (API key) ==="
+	@echo "Autenticacao: X-Api-Key injetado pelo plugin Go"
+	@echo
+	@curl --fail --silent --show-error \
+	  --header "Authorization: $(CLIENT_KEY)" \
+	  "$(TYK_URL)/api/integration/servico-a/operation/depurar-requisicao" | jq '.url, .headers."X-Api-Key"' && echo
+
+integration-servico-b: create-key oauth-direct-denied ## servico-b: API protegida por OAuth2 Client Credentials
 	@$(MAKE) --no-print-directory oauth-ready
 	@$(MAKE) --no-print-directory reload
 	@echo
-	@echo "=== API externa protegida por OAuth2 Client Credentials ==="
-	@echo "URL: /api/integration/oauth/operation/resource"
+	@echo "=== servico-b (Bearer OAuth) ==="
+	@echo "URL: /api/integration/servico-b/operation/acessar"
 	@echo "Autenticacao: Bearer token obtido via broker -> Keycloak"
 	@echo
 	@curl --fail --silent --show-error \
 	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/oauth/operation/resource" | jq '.' && echo
+	  "$(TYK_URL)/api/integration/servico-b/operation/acessar-recurso" | jq '.' && echo
 
-oauth-token-cache: create-key ## Mostra obtencao e reutilizacao do access token
+integration-servico-c: create-key ## servico-c: httpbin com Basic Auth
+	@echo "=== servico-c (Basic Auth) ==="
+	@echo "Autenticacao: Basic Auth injetado pelo plugin Go"
+	@echo
+	@curl --fail --silent --show-error \
+	  --header "Authorization: $(CLIENT_KEY)" \
+	  "$(TYK_URL)/api/integration/servico-c/operation/verificar-cabecalhos" | jq '.headers.Authorization' && echo
+
+cache-servico-b: create-key ## Mostra cache do access token (servico-b)
 	@$(MAKE) --no-print-directory oauth-ready
 	@$(MAKE) --no-print-directory reload
 	@$(COMPOSE) restart tyk >/dev/null
@@ -107,33 +123,17 @@ oauth-token-cache: create-key ## Mostra obtencao e reutilizacao do access token
 	@i=1; while [ $$i -le 2 ]; do \
 	  echo "Chamada $$i:"; \
 	  curl --fail --silent --show-error \
-	    --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/oauth/operation/resource" \
+	    --header "Authorization: $(CLIENT_KEY)" 	    "$(TYK_URL)/api/integration/servico-b/operation/acessar-recurso" \
 	    | jq '{ message, received_headers: { x_broker_source: .received_headers["x-broker-source"] } }'; \
 	  echo; \
 	  i=$$((i + 1)); \
 	done
 
-plugin-denied: create-key ## Mostra o broker rejeitando uma acao nao catalogada
-	@echo "=== Acao nao catalogada ==="
+denied-servico-b: create-key ## Mostra o broker rejeitando operacao inexistente
+	@echo "=== Operacao inexistente ==="
 	@http_code=$$(curl --silent --output /dev/null --write-out '%{http_code}' \
-	  --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/oauth/operation/delete-all"); \
+	  --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/servico-b/operation/delete-all"); \
 	 test "$$http_code" = "502" && echo "Resultado: HTTP 502 — broker rejeitou (credential_not_found)." || { echo "Esperado 502, recebido $$http_code"; exit 1; }
-
-integration-httpbin: create-key ## Testa integracao httpbin com API key
-	@echo "=== Integracao httpbin (API key) ==="
-	@echo "Autenticacao: X-Api-Key injetado pelo plugin Go"
-	@echo
-	@curl --fail --silent --show-error \
-	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/httpbin/operation/get" | jq '.url, .headers."X-Api-Key"' && echo
-
-integration-echo: create-key ## Testa integracao echo com Basic Auth
-	@echo "=== Integracao echo (Basic Auth) ==="
-	@echo "Autenticacao: Basic Auth injetado pelo plugin Go"
-	@echo
-	@curl --fail --silent --show-error \
-	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/api/integration/echo/operation/headers" | jq '.headers.Authorization' && echo
 
 reload: ## Recarrega as APIs sem reiniciar o Gateway
 	@echo "=== Hot reload das APIs ==="
