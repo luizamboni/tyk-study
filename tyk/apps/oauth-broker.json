@@ -11,7 +11,7 @@
   "active": true,
   "global_rate_limit": { "rate": 100, "per": 60 },
   "proxy": {
-    "listen_path": "/integrations/",
+    "listen_path": "/api/integration/",
     "target_url": "http://protected-api:3000/",
     "strip_listen_path": false
   },

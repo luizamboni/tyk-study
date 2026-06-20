@@ -25,8 +25,8 @@ function successBody(request, claims) {
     },
     routing: {
       tenant: request.headers["x-tenant-id"],
-      service: request.headers["x-integration-service"],
-      action: request.headers["x-integration-action"],
+      name: request.headers["x-integration-name"],
+      operation: request.headers["x-integration-operation"],
       plugin_token_source: request.headers["x-plugin-token-source"],
       broker_token_source: request.headers["x-broker-token-source"]
     },

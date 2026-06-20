@@ -7,7 +7,7 @@ DEMO_KEY ?= demo-client-key
 CLIENT_KEY := demo-org$(DEMO_KEY)
 COMPOSE := docker compose
 
-.PHONY: help check plugin-check plugin-build up down reset logs ps health create-key oauth-ready oauth-upstream oauth-direct-denied oauth-token-cache plugin-denied reload list-apis
+.PHONY: help check plugin-check plugin-build up down reset logs ps health create-key oauth-ready oauth-upstream oauth-direct-denied oauth-token-cache plugin-denied reload list-apis integration-httpbin integration-echo
 
 help: ## Lista os comandos disponiveis
 	@awk 'BEGIN {FS = ":.*## "; printf "Uso: make <alvo>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -89,15 +89,12 @@ oauth-upstream: create-key oauth-direct-denied ## Demonstra Tyk, broker, Keycloa
 	@$(MAKE) --no-print-directory reload
 	@echo
 	@echo "=== API externa protegida por OAuth2 Client Credentials ==="
-	@echo "1. Cliente autentica no Tyk com a chave unica."
-	@echo "2. O plugin Go obtem tenant, servico e acao."
-	@echo "3. Em cache miss, o plugin pede um token ao broker."
-	@echo "4. O plugin chama diretamente a API externa com Bearer token."
-	@echo "5. A API valida assinatura, issuer, expiracao e client_id pelo JWKS."
+	@echo "URL: /api/integration/oauth/operation/resource"
+	@echo "Autenticacao: Bearer token obtido via broker -> Keycloak"
 	@echo
 	@curl --fail --silent --show-error \
 	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/integrations/oauth/resource" | jq '.' && echo
+	  "$(TYK_URL)/api/integration/oauth/operation/resource" | jq '.' && echo
 
 oauth-token-cache: create-key ## Mostra obtencao e reutilizacao do access token
 	@$(MAKE) --no-print-directory oauth-ready
@@ -110,7 +107,7 @@ oauth-token-cache: create-key ## Mostra obtencao e reutilizacao do access token
 	@i=1; while [ $$i -le 2 ]; do \
 	  echo "Chamada $$i:"; \
 	  curl --fail --silent --show-error \
-	    --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/integrations/oauth/resource" \
+	    --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/oauth/operation/resource" \
 	    | grep -E 'plugin_token_source|broker_token_source'; \
 	  i=$$((i + 1)); \
 	done
@@ -118,8 +115,24 @@ oauth-token-cache: create-key ## Mostra obtencao e reutilizacao do access token
 plugin-denied: create-key ## Mostra o plugin bloqueando uma acao nao catalogada
 	@echo "=== Acao nao catalogada ==="
 	@http_code=$$(curl --silent --output /dev/null --write-out '%{http_code}' \
-	  --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/integrations/oauth/delete-all"); \
+	  --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/oauth/operation/delete-all"); \
 	 test "$$http_code" = "403" && echo "Resultado: HTTP 403 — bloqueada pelo plugin." || { echo "Esperado 403, recebido $$http_code"; exit 1; }
+
+integration-httpbin: create-key ## Testa integracao httpbin com API key
+	@echo "=== Integracao httpbin (API key) ==="
+	@echo "Autenticacao: X-Api-Key injetado pelo plugin Go"
+	@echo
+	@curl --fail --silent --show-error \
+	  --header "Authorization: $(CLIENT_KEY)" \
+	  "$(TYK_URL)/api/integration/httpbin/operation/get" | jq '.url, .headers."X-Api-Key"' && echo
+
+integration-echo: create-key ## Testa integracao echo com Basic Auth
+	@echo "=== Integracao echo (Basic Auth) ==="
+	@echo "Autenticacao: Basic Auth injetado pelo plugin Go"
+	@echo
+	@curl --fail --silent --show-error \
+	  --header "Authorization: $(CLIENT_KEY)" \
+	  "$(TYK_URL)/api/integration/echo/operation/headers" | jq '.headers.Authorization' && echo
 
 reload: ## Recarrega as APIs sem reiniciar o Gateway
 	@echo "=== Hot reload das APIs ==="

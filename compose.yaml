@@ -10,6 +10,9 @@ services:
       timeout: 2s
       retries: 15
 
+  upstream:
+    image: kennethreitz/httpbin:latest
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.3
     command: start-dev --import-realm
@@ -58,6 +61,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      upstream:
+        condition: service_started
       token-broker:
         condition: service_started
     ports:
@@ -65,6 +70,9 @@ services:
     environment:
       TOKEN_BROKER_URL: http://token-broker:3000
       TOKEN_BROKER_INTERNAL_TOKEN: broker-internal-demo
+      INTEGRATION_HTTPBIN_KEY: demo-httpbin-key
+      INTEGRATION_ECHO_USER: demo-echo
+      INTEGRATION_ECHO_PASS: demo-echo-pass
     volumes:
       - ./tyk/tyk.conf:/opt/tyk-gateway/tyk.conf:ro
       # Gravável para permitir que a Gateway API persista definições criadas via REST.
