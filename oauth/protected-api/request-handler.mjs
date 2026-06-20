@@ -1,6 +1,18 @@
 import { sendJson } from "./http-response.mjs";
 import { verifyJwt } from "./jwt-verifier.mjs";
 
+function receivedHeaders(request) {
+  const hdrs = {};
+  for (const [key, value] of Object.entries(request.headers)) {
+    if (key.startsWith("x-") || key.startsWith("x-integration-") || key.startsWith("x-plugin-") || key.startsWith("x-broker-")) {
+      hdrs[key] = value;
+    }
+  }
+  hdrs["x-ratelimit-limit"] = request.headers["x-ratelimit-limit"];
+  hdrs["x-ratelimit-remaining"] = request.headers["x-ratelimit-remaining"];
+  return hdrs;
+}
+
 function successBody(request, claims) {
   return {
     message: "A API externa aceitou o token emitido pelo Keycloak.",
@@ -17,7 +29,8 @@ function successBody(request, claims) {
       action: request.headers["x-integration-action"],
       plugin_token_source: request.headers["x-plugin-token-source"],
       broker_token_source: request.headers["x-broker-token-source"]
-    }
+    },
+    received_headers: receivedHeaders(request)
   };
 }
 

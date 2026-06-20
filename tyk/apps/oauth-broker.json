@@ -9,6 +9,7 @@
     "authToken": { "auth_header_name": "Authorization" }
   },
   "active": true,
+  "global_rate_limit": { "rate": 100, "per": 60 },
   "proxy": {
     "listen_path": "/integrations/",
     "target_url": "http://protected-api:3000/",
@@ -30,7 +31,15 @@
   "version_data": {
     "not_versioned": true,
     "versions": {
-      "Default": { "name": "Default", "use_extended_paths": true }
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true,
+        "global_headers": {
+          "X-Integration-Gateway": "Tyk",
+          "X-Rate-Limit-Policy": "100-per-minute"
+        },
+        "global_headers_remove": ["X-Internal-Debug"]
+      }
     }
   }
 }
