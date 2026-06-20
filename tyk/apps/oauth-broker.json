@@ -20,7 +20,7 @@
     "post_key_auth": [
       {
         "name": "RouteIntegration",
-        "path": "/opt/tyk-gateway/middleware/IntegrationBroker_v5.8.5_linux_arm64.so",
+        "path": "/opt/tyk-gateway/middleware/IntegrationBroker.so",
         "require_session": true,
         "raw_body_only": false
       }
