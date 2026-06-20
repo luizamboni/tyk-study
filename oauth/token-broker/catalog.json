@@ -24,7 +24,7 @@
           }
         },
         "educacao": {
-          "target_url": "http://protected-api:3000",
+          "target_url": "http://servico-educacao:3000",
           "auth": {
             "type": "bearer",
             "oauth_provider": "keycloak-tyk-demo"

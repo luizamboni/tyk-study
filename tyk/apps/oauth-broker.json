@@ -12,7 +12,7 @@
   "global_rate_limit": { "rate": 100, "per": 60 },
   "proxy": {
     "listen_path": "/api/integration/",
-    "target_url": "http://protected-api:3000/",
+    "target_url": "http://servico-educacao:3000/",
     "strip_listen_path": false
   },
   "custom_middleware": {

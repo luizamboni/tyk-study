@@ -1,36 +1,35 @@
 import { sendJson } from "./http-response.mjs";
 import { verifyJwt } from "./jwt-verifier.mjs";
 
-function receivedHeaders(request) {
-  const hdrs = {};
-  for (const [key, value] of Object.entries(request.headers)) {
-    if (key.startsWith("x-") || key.startsWith("x-integration-") || key.startsWith("x-plugin-") || key.startsWith("x-broker-")) {
-      hdrs[key] = value;
-    }
-  }
-  hdrs["x-ratelimit-limit"] = request.headers["x-ratelimit-limit"];
-  hdrs["x-ratelimit-remaining"] = request.headers["x-ratelimit-remaining"];
-  return hdrs;
-}
-
 function successBody(request, claims) {
   return {
-    message: "A API externa aceitou o token emitido pelo Keycloak.",
-    path: request.url,
-    validated_claims: {
+    aluno: {
+      matricula: "20240101",
+      nome: "Maria Silva",
+      cpf: "123.456.789-00"
+    },
+    curso: {
+      codigo: "ENG-CIV",
+      nome: "Engenharia Civil",
+      instituicao: "Universidade Federal do Brasil",
+      periodo_ingresso: "2024.1"
+    },
+    historico: [
+      { codigo: "MAT101", disciplina: "Calculo I", carga_horaria: 80, nota: 8.5, frequencia: "92%", status: "aprovado" },
+      { codigo: "FIS101", disciplina: "Fisica I", carga_horaria: 80, nota: 7.0, frequencia: "88%", status: "aprovado" },
+      { codigo: "QUI101", disciplina: "Quimica Geral", carga_horaria: 60, nota: 6.5, frequencia: "75%", status: "aprovado" },
+      { codigo: "DES101", disciplina: "Desenho Tecnico", carga_horaria: 40, nota: 9.0, frequencia: "95%", status: "aprovado" },
+      { codigo: "INT101", disciplina: "Introducao a Engenharia", carga_horaria: 40, nota: 7.5, frequencia: "90%", status: "aprovado" },
+      { codigo: "MAT102", disciplina: "Calculo II", carga_horaria: 80, nota: 4.0, frequencia: "60%", status: "reprovado" }
+    ],
+    cr: 7.08,
+    creditos_cursados: 300,
+    creditos_integrais: 3200,
+    jwt_validated: {
       issuer: claims.iss,
       client: claims.azp,
-      subject: claims.sub,
       expires_at: new Date(claims.exp * 1000).toISOString()
-    },
-    routing: {
-      tenant: request.headers["x-tenant-id"],
-      name: request.headers["x-integration-name"],
-      operation: request.headers["x-integration-operation"],
-      plugin_token_source: request.headers["x-plugin-token-source"],
-      broker_token_source: request.headers["x-broker-token-source"]
-    },
-    received_headers: receivedHeaders(request)
+    }
   };
 }
 
