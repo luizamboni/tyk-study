@@ -37,7 +37,7 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ./oauth/protected-api/server.mjs:/app/server.mjs:ro
+      - ./oauth/protected-api:/app:ro
 
   token-broker:
     image: node:22-alpine
@@ -47,14 +47,14 @@ services:
       TOKEN_URL: http://keycloak:8080/realms/tyk-demo/protocol/openid-connect/token
       CLIENT_ID: tyk-broker
       CLIENT_SECRET: broker-secret
-      UPSTREAM_URL: http://protected-api:3000
+      INTERNAL_TOKEN: broker-internal-demo
     depends_on:
       keycloak:
         condition: service_started
       protected-api:
         condition: service_started
     volumes:
-      - ./oauth/token-broker/server.mjs:/app/server.mjs:ro
+      - ./oauth/token-broker:/app:ro
 
   tyk:
     image: tykio/tyk-gateway:v5.8.5
