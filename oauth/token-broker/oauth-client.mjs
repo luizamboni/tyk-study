@@ -1,10 +1,8 @@
-import { clientId, clientSecret, tokenUrl } from "./config.mjs";
-
 const expirationMarginMs = 5000;
 let cachedToken;
 
-function validCachedToken() {
-  if (!cachedToken) {
+function validCachedToken(clientId) {
+  if (!cachedToken || cachedToken.clientId !== clientId) {
     return undefined;
   }
   if (Date.now() >= cachedToken.expiresAt - expirationMarginMs) {
@@ -13,15 +11,15 @@ function validCachedToken() {
   return cachedToken;
 }
 
-function basicCredentials() {
+function basicCredentials(clientId, clientSecret) {
   return Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 }
 
-async function requestToken() {
+async function requestToken(tokenUrl, clientId, clientSecret) {
   const response = await fetch(tokenUrl, {
     method: "POST",
     headers: {
-      authorization: `Basic ${basicCredentials()}`,
+      authorization: `Basic ${basicCredentials(clientId, clientSecret)}`,
       "content-type": "application/x-www-form-urlencoded"
     },
     body: "grant_type=client_credentials"
@@ -33,6 +31,7 @@ async function requestToken() {
   }
 
   cachedToken = {
+    clientId,
     value: body.access_token,
     expiresAt: Date.now() + body.expires_in * 1000
   };
@@ -40,12 +39,12 @@ async function requestToken() {
   return cachedToken;
 }
 
-export async function accessToken() {
-  const token = validCachedToken();
+export async function accessToken(tokenUrl, clientId, clientSecret) {
+  const token = validCachedToken(clientId);
   if (token) {
     return { ...token, source: "cache" };
   }
 
-  const newToken = await requestToken();
+  const newToken = await requestToken(tokenUrl, clientId, clientSecret);
   return { ...newToken, source: "keycloak" };
 }

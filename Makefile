@@ -108,15 +108,16 @@ oauth-token-cache: create-key ## Mostra obtencao e reutilizacao do access token
 	  echo "Chamada $$i:"; \
 	  curl --fail --silent --show-error \
 	    --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/oauth/operation/resource" \
-	    | grep -E 'plugin_token_source|broker_token_source'; \
+	    | jq '{ message, received_headers: { x_broker_source: .received_headers["x-broker-source"] } }'; \
+	  echo; \
 	  i=$$((i + 1)); \
 	done
 
-plugin-denied: create-key ## Mostra o plugin bloqueando uma acao nao catalogada
+plugin-denied: create-key ## Mostra o broker rejeitando uma acao nao catalogada
 	@echo "=== Acao nao catalogada ==="
 	@http_code=$$(curl --silent --output /dev/null --write-out '%{http_code}' \
 	  --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/api/integration/oauth/operation/delete-all"); \
-	 test "$$http_code" = "403" && echo "Resultado: HTTP 403 — bloqueada pelo plugin." || { echo "Esperado 403, recebido $$http_code"; exit 1; }
+	 test "$$http_code" = "502" && echo "Resultado: HTTP 502 — broker rejeitou (credential_not_found)." || { echo "Esperado 502, recebido $$http_code"; exit 1; }
 
 integration-httpbin: create-key ## Testa integracao httpbin com API key
 	@echo "=== Integracao httpbin (API key) ==="

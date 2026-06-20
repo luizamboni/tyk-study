@@ -44,10 +44,6 @@ services:
     command: node /app/server.mjs
     environment:
       PORT: 3000
-      TOKEN_URL: http://keycloak:8080/realms/tyk-demo/protocol/openid-connect/token
-      CLIENT_ID: tyk-broker
-      CLIENT_SECRET: broker-secret
-      INTERNAL_TOKEN: broker-internal-demo
     depends_on:
       keycloak:
         condition: service_started
@@ -68,11 +64,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      TOKEN_BROKER_URL: http://token-broker:3000
-      TOKEN_BROKER_INTERNAL_TOKEN: broker-internal-demo
-      INTEGRATION_HTTPBIN_KEY: demo-httpbin-key
-      INTEGRATION_ECHO_USER: demo-echo
-      INTEGRATION_ECHO_PASS: demo-echo-pass
+      CREDENTIAL_BROKER_URL: http://token-broker:3000
     volumes:
       - ./tyk/tyk.conf:/opt/tyk-gateway/tyk.conf:ro
       # Gravável para permitir que a Gateway API persista definições criadas via REST.

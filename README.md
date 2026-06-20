@@ -2,13 +2,17 @@
 
 Ambiente local para explorar o Tyk Gateway OSS como um hub de
 integracoes, onde cada integracao tem seu propio upstream e
-metodo de autenticacao, roteados pelo plugin Go.
+metodo de autenticacao, com resolucao centralizada de credenciais.
 
 ```
-Cliente -> chave Tyk -> Tyk + plugin Go -> upstream (httpbin)
-                                         -> token broker -> Keycloak -> protected-api
-                                         -> upstream (httpbin) com Basic Auth
+Cliente -> chave Tyk -> Tyk + plugin Go -> credential broker -> upstream (httpbin)
+                                                              -> Keycloak -> protected-api
+                                                              -> upstream (httpbin)
 ```
+
+O **credential broker** é o ponto único de resolucao de autenticacao:
+plugin pergunta "o que preciso para chamar X?", broker responde com
+o tipo de auth + credenciais + target URL.
 
 ## Pre-requisitos
 
@@ -67,7 +71,7 @@ Todas as requisicoes passam por uma unica API definition no Tyk:
 | `make oauth-upstream` | Fluxo OAuth2 completo (broker -> Keycloak -> JWT) |
 | `make integration-echo` | Chama httpbin com Basic Auth injetado pelo plugin |
 | `make oauth-token-cache` | Mostra o cache do access token no plugin Go |
-| `make plugin-denied` | Mostra o plugin bloqueando operacao nao catalogada (403) |
+| `make plugin-denied` | Mostra o broker rejeitando operacao nao catalogada |
 | `make oauth-direct-denied` | Mostra que a API protegida rejeita chamadas sem token |
 
 ### Administracao do Tyk
@@ -79,23 +83,64 @@ Todas as requisicoes passam por uma unica API definition no Tyk:
 
 ## Arquitetura
 
-O plugin Go intercepta requisicoes em `/api/integration/`, extrai o nome
-da integracao e a operacao do path, consulta um catalogo interno que
-define o upstream alvo e o tipo de autenticacao:
+### Fluxo de requisicao
 
-- **api-key**: le a chave de uma variavel de ambiente e injeta no header
-- **oauth**: consulta o token broker (`POST /internal/v1/tokens/resolve`),
-  que obtem um access token do Keycloak. O token e cacheado em memoria
-  no plugin (30s, mesmo TTL do JWT). A API externa valida o JWT pelo JWKS.
-- **basic**: le usuario/senha de variaveis de ambiente e injeta
-  `Authorization: Basic ...`
+1. Cliente envia requisicao para `/api/integration/{nome}/operation/{op}`
+   com uma chave Tyk que contem `tenant_id` nos metadados
+2. Plugin Go extrai `{nome}`, `{op}` e o metodo HTTP do path
+3. Plugin consulta o **credential broker** via
+   `POST /internal/v1/credentials/resolve` com `{tenant, integration, operation, method}`
+4. Broker consulta `catalog.json`, monta a resposta com `target_url`,
+   `operation_path`, `auth_type` e as credenciais adequadas
+5. Plugin aplica a autenticacao e encaminha:
+   - **api-key / basic**: plugin faz a chamada HTTP diretamente ao upstream
+   - **bearer**: plugin modifica headers e URL, Tyk faz o proxy
 
-Integracoes com autenticacao simples (api-key, basic) sao chamadas
-diretamente pelo plugin via HTTP. A integracao OAuth modifica os headers
-da requisicao original e deixa o Tyk fazer o proxy para o upstream.
+### Credential broker
 
-O console administrativo do Keycloak esta em `http://localhost:8081`,
-usuario e senha `admin`.
+Servico Node.js que centraliza toda configuracao de integracoes:
+
+- `catalog.json` externo (montado como volume): tenants, integracoes,
+  operacoes, credenciais e provedores OAuth
+- `POST /internal/v1/reload` recarrega o catalog.json sem restart
+- Cache de access tokens OAuth em memoria (expira junto com o JWT)
+
+### Catalog.json
+
+```json
+{
+  "oauth_providers": {
+    "keycloak-tyk-demo": {
+      "token_url": "http://keycloak:8080/realms/tyk-demo/...",
+      "client_id": "tyk-broker",
+      "client_secret": "broker-secret"
+    }
+  },
+  "tenants": {
+    "tenant-a": {
+      "integrations": {
+        "httpbin": {
+          "target_url": "http://upstream",
+          "operations": {
+            "get": {
+              "auth_type": "api-key",
+              "path": "/get",
+              "header_name": "X-Api-Key",
+              "header_value": "demo-httpbin-key"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Plugin Go
+
+Nao possui catalogo interno nem le variaveis de ambiente de
+credenciais. Delega toda resolucao de autenticacao ao broker.
+Cacheia apenas access tokens OAuth (que expiram).
 
 ## Personalizacao
 
@@ -103,6 +148,21 @@ usuario e senha `admin`.
 make integration-httpbin DEMO_KEY=outra-chave
 ```
 
-As credenciais de cada integracao estao no `compose.yaml` como variaveis
-de ambiente do container `tyk`. Este ambiente e didatico: nao reutilize
-as credenciais em producao.
+Para alterar credenciais, edite `oauth/token-broker/catalog.json` e
+recarregue:
+
+```sh
+docker compose exec token-broker node -e "
+  const http = require('http');
+  const req = http.request('http://localhost:3000/internal/v1/reload',
+    { method:'POST' }, res => {
+      let b = '';
+      res.on('data', c => b += c);
+      res.on('end', () => console.log(b));
+    });
+  req.write('{}');
+  req.end();
+"
+```
+
+Este ambiente e didatico: nao reutilize as credenciais em producao.

@@ -7,93 +7,68 @@ import (
 
 const expirationMargin = 5 * time.Second
 
-type Value struct {
-	AccessToken string
-	ExpiresAt   time.Time
-}
-
-type Result struct {
-	Value        Value
-	PluginSource string
-	BrokerSource string
+type cachedEntry struct {
+	cred     Credential
+	expiresAt time.Time
 }
 
 type pendingResolution struct {
-	done   chan struct{}
-	result Result
-	err    error
+	done chan struct{}
+	cred Credential
+	err  error
 }
 
 type Resolver struct {
 	mutex   sync.Mutex
-	cache   map[string]Value
+	cache   map[string]cachedEntry
 	pending map[string]*pendingResolution
 	broker  *Broker
 }
 
 func NewResolver(broker *Broker) *Resolver {
 	return &Resolver{
-		cache:   make(map[string]Value),
+		cache:   make(map[string]cachedEntry),
 		pending: make(map[string]*pendingResolution),
 		broker:  broker,
 	}
 }
 
-func (resolver *Resolver) Resolve(tenant, service string) (Result, error) {
-	key := tenant + ":" + service
+func (r *Resolver) Resolve(tenant, integration, operation, method string) (Credential, error) {
+	key := tenant + ":" + integration + ":" + operation
 
-	resolver.mutex.Lock()
-	if value, found := resolver.validCachedValue(key); found {
-		resolver.mutex.Unlock()
-		return Result{
-			Value:        value,
-			PluginSource: "plugin-cache",
-			BrokerSource: "not-called",
-		}, nil
+	r.mutex.Lock()
+	if entry, found := r.validCached(key); found {
+		r.mutex.Unlock()
+		return entry.cred, nil
 	}
-	if pending, found := resolver.pending[key]; found {
-		resolver.mutex.Unlock()
-		<-pending.done
-		return pending.result, pending.err
+	if p, found := r.pending[key]; found {
+		r.mutex.Unlock()
+		<-p.done
+		return p.cred, p.err
 	}
-	pending := &pendingResolution{done: make(chan struct{})}
-	resolver.pending[key] = pending
-	resolver.mutex.Unlock()
+	p := &pendingResolution{done: make(chan struct{})}
+	r.pending[key] = p
+	r.mutex.Unlock()
 
-	value, brokerSource, err := resolver.broker.Resolve(tenant, service)
-	result := Result{
-		Value:        value,
-		PluginSource: "token-broker",
-		BrokerSource: brokerSource,
-	}
-	resolver.finishResolution(key, pending, result, err)
+	cred, err := r.broker.Resolve(tenant, integration, operation, method)
 
-	return result, err
+	r.mutex.Lock()
+	p.cred = cred
+	p.err = err
+	if err == nil && !cred.ExpiresAt.IsZero() {
+		r.cache[key] = cachedEntry{cred: cred, expiresAt: cred.ExpiresAt}
+	}
+	delete(r.pending, key)
+	close(p.done)
+	r.mutex.Unlock()
+
+	return cred, err
 }
 
-func (resolver *Resolver) validCachedValue(key string) (Value, bool) {
-	value, found := resolver.cache[key]
-	if !found || time.Now().After(value.ExpiresAt.Add(-expirationMargin)) {
-		return Value{}, false
+func (r *Resolver) validCached(key string) (cachedEntry, bool) {
+	entry, found := r.cache[key]
+	if !found || time.Now().After(entry.expiresAt.Add(-expirationMargin)) {
+		return cachedEntry{}, false
 	}
-
-	return value, true
-}
-
-func (resolver *Resolver) finishResolution(
-	key string,
-	pending *pendingResolution,
-	result Result,
-	err error,
-) {
-	resolver.mutex.Lock()
-	defer resolver.mutex.Unlock()
-
-	pending.result = result
-	pending.err = err
-	if err == nil {
-		resolver.cache[key] = result.Value
-	}
-	delete(resolver.pending, key)
-	close(pending.done)
+	return entry, true
 }

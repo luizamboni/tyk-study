@@ -1,0 +1,57 @@
+{
+  "oauth_providers": {
+    "keycloak-tyk-demo": {
+      "token_url": "http://keycloak:8080/realms/tyk-demo/protocol/openid-connect/token",
+      "client_id": "tyk-broker",
+      "client_secret": "broker-secret"
+    }
+  },
+  "tenants": {
+    "tenant-a": {
+      "integrations": {
+        "httpbin": {
+          "target_url": "http://upstream",
+          "operations": {
+            "get": {
+              "auth_type": "api-key",
+              "path": "/get",
+              "method": "GET",
+              "header_name": "X-Api-Key",
+              "header_value": "demo-httpbin-key"
+            },
+            "post": {
+              "auth_type": "api-key",
+              "path": "/post",
+              "method": "POST",
+              "header_name": "X-Api-Key",
+              "header_value": "demo-httpbin-key"
+            }
+          }
+        },
+        "oauth": {
+          "target_url": "http://protected-api:3000",
+          "operations": {
+            "resource": {
+              "auth_type": "bearer",
+              "path": "/resource",
+              "method": "GET",
+              "oauth_provider": "keycloak-tyk-demo"
+            }
+          }
+        },
+        "echo": {
+          "target_url": "http://upstream",
+          "operations": {
+            "headers": {
+              "auth_type": "basic",
+              "path": "/headers",
+              "method": "GET",
+              "username": "demo-echo",
+              "password": "demo-echo-pass"
+            }
+          }
+        }
+      }
+    }
+  }
+}
