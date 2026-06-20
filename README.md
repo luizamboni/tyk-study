@@ -5,9 +5,9 @@ integracoes, onde cada integracao tem seu propio upstream e
 metodo de autenticacao, com resolucao centralizada de credenciais.
 
 ```
-Cliente -> chave Tyk -> Tyk + plugin Go -> credential broker -> upstream (echo server)
+Cliente -> chave Tyk -> Tyk + plugin Go -> credential broker -> servico-construcao
                                                               -> Keycloak -> protected-api
-                                                              -> upstream (echo server)
+                                                              -> servico-saude
 ```
 
 O **credential broker** é o ponto único de resolucao de autenticacao:

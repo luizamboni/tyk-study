@@ -10,7 +10,13 @@ services:
       timeout: 2s
       retries: 15
 
-  upstream:
+  servico-construcao:
+    image: node:22-alpine
+    command: node /app/server.mjs
+    volumes:
+      - ./upstream:/app:ro
+
+  servico-saude:
     image: node:22-alpine
     command: node /app/server.mjs
     volumes:
@@ -62,7 +68,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      upstream:
+      servico-construcao:
+        condition: service_started
+      servico-saude:
         condition: service_started
       token-broker:
         condition: service_started

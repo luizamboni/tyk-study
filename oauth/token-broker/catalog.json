@@ -10,7 +10,7 @@
     "tenant-a": {
       "integrations": {
         "construcao": {
-          "target_url": "http://upstream:3000",
+          "target_url": "http://servico-construcao:3000",
           "auth": {
             "type": "api-key",
             "header_name": "X-Api-Key",
@@ -37,7 +37,7 @@
           }
         },
         "saude": {
-          "target_url": "http://upstream:3000",
+          "target_url": "http://servico-saude:3000",
           "auth": {
             "type": "basic",
             "username": "demo-echo",
