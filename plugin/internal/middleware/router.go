@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -99,6 +102,12 @@ func (router *Router) buildUpstreamRequest(original *http.Request, cred token.Cr
 	return upstream, nil
 }
 
+type base64Envelope struct {
+	Content     string `json:"content"`
+	ContentType string `json:"content_type"`
+	Filename    string `json:"filename"`
+}
+
 func (router *Router) proxyUpstream(writer http.ResponseWriter, upstream *http.Request) {
 	resp, err := router.client.Do(upstream)
 	if err != nil {
@@ -115,6 +124,17 @@ func (router *Router) proxyUpstream(writer http.ResponseWriter, upstream *http.R
 		return
 	}
 
+	if decoded, ok := tryDecodeBase64(body); ok {
+		for key := range resp.Header {
+			writer.Header().Del(key)
+		}
+		writer.Header().Set("Content-Type", decoded.ContentType)
+		writer.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, decoded.Filename))
+		writer.WriteHeader(resp.StatusCode)
+		writer.Write(decoded.Data)
+		return
+	}
+
 	for key, values := range resp.Header {
 		for _, value := range values {
 			writer.Header().Add(key, value)
@@ -122,6 +142,31 @@ func (router *Router) proxyUpstream(writer http.ResponseWriter, upstream *http.R
 	}
 	writer.WriteHeader(resp.StatusCode)
 	writer.Write(body)
+}
+
+type decodedAsset struct {
+	ContentType string
+	Filename    string
+	Data        []byte
+}
+
+func tryDecodeBase64(body []byte) (decodedAsset, bool) {
+	var env base64Envelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return decodedAsset{}, false
+	}
+	if env.Content == "" || env.ContentType == "" || env.Filename == "" {
+		return decodedAsset{}, false
+	}
+	data, err := base64.StdEncoding.DecodeString(env.Content)
+	if err != nil {
+		return decodedAsset{}, false
+	}
+	return decodedAsset{
+		ContentType: env.ContentType,
+		Filename:    env.Filename,
+		Data:        data,
+	}, true
 }
 
 func tenantFromSession(request *http.Request) (string, bool) {
