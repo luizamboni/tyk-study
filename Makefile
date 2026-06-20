@@ -88,7 +88,7 @@ create-key: ## Cria uma chave de acesso para a API protegida
 	  --header "x-tyk-authorization: $(TYK_SECRET)" \
 	  --header "Content-Type: application/json" \
 	  --request POST "$(TYK_URL)/tyk/keys/$(DEMO_KEY)" \
-	  --data '{"alias":"Cliente demo","org_id":"demo-org","rate":100,"per":60,"quota_max":-1,"access_rights":{"protected-api":{"api_id":"protected-api","api_name":"API protegida por token","versions":["Default"]},"upstream-query-api":{"api_id":"upstream-query-api","api_name":"Upstream autenticado por query string","versions":["Default"]},"upstream-header-api":{"api_id":"upstream-header-api","api_name":"Upstream autenticado por cabecalho","versions":["Default"]},"oauth-broker-api":{"api_id":"oauth-broker-api","api_name":"API externa OAuth via token broker","versions":["Default"]}}}' && echo
+	  --data '{"alias":"Cliente demo","org_id":"demo-org","rate":100,"per":60,"quota_max":-1,"meta_data":{"tenant_id":"tenant-a"},"access_rights":{"protected-api":{"api_id":"protected-api","api_name":"API protegida por token","versions":["Default"]},"upstream-query-api":{"api_id":"upstream-query-api","api_name":"Upstream autenticado por query string","versions":["Default"]},"upstream-header-api":{"api_id":"upstream-header-api","api_name":"Upstream autenticado por cabecalho","versions":["Default"]},"oauth-broker-api":{"api_id":"oauth-broker-api","api_name":"Integrações via plugin Go","versions":["Default"]}}}' && echo
 
 auth: create-key ## Chama a API protegida usando a chave criada
 	@echo
@@ -154,30 +154,37 @@ oauth-upstream: create-key oauth-direct-denied ## Demonstra Tyk, broker, Keycloa
 	@echo
 	@echo "=== API externa protegida por OAuth2 Client Credentials ==="
 	@echo "1. Cliente autentica no Tyk com a chave única."
-	@echo "2. Tyk remove essa chave e chama o token broker."
-	@echo "3. Broker obtém um access token no Keycloak."
-	@echo "4. Broker chama a API externa com Authorization: Bearer <token>."
-	@echo "5. API valida assinatura, issuer, expiração e client_id pelo JWKS."
+	@echo "2. O plugin Go obtém tenant, serviço e ação."
+	@echo "3. Em cache miss, o plugin pede um token ao broker."
+	@echo "4. O plugin chama diretamente a API externa com Bearer token."
+	@echo "5. A API valida assinatura, issuer, expiração e client_id pelo JWKS."
 	@echo
 	@curl --fail --silent --show-error --include \
 	  --header "Authorization: $(CLIENT_KEY)" \
-	  "$(TYK_URL)/services/oauth/resource" && echo
+	  "$(TYK_URL)/integrations/oauth/resource" && echo
 
 oauth-token-cache: create-key ## Mostra obtenção e reutilização do access token
 	@$(MAKE) --no-print-directory oauth-ready
 	@$(MAKE) --no-print-directory reload
-	@$(COMPOSE) restart token-broker >/dev/null
-	@sleep 1
-	@echo "=== Cache do access token no broker ==="
-	@echo "X-Token-Source=keycloak indica token novo; cache indica reutilização."
+	@$(COMPOSE) restart tyk >/dev/null
+	@sleep 2
+	@echo "=== Cache do access token no plugin Go ==="
+	@echo "A primeira chamada consulta o broker; a segunda usa a memória do plugin."
 	@echo
 	@i=1; while [ $$i -le 2 ]; do \
 	  echo "Chamada $$i:"; \
-	  curl --fail --silent --show-error --dump-header - --output /dev/null \
-	    --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/services/oauth/resource" \
-	    | grep -i '^x-token-source:'; \
+	  curl --fail --silent --show-error \
+	    --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/integrations/oauth/resource" \
+	    | grep -E 'plugin_token_source|broker_token_source'; \
 	  i=$$((i + 1)); \
 	done
+
+plugin-denied: create-key ## Mostra o plugin bloqueando uma ação não catalogada
+	@echo "=== Ação não catalogada ==="
+	@http_code=$$(curl --silent --output /tmp/tky-plugin-denied.json --write-out '%{http_code}' \
+	  --header "Authorization: $(CLIENT_KEY)" "$(TYK_URL)/integrations/oauth/delete-all"); \
+	 cat /tmp/tky-plugin-denied.json; echo; \
+	 test "$$http_code" = "403" && echo "Resultado: HTTP 403 — bloqueada pelo plugin." || exit 1
 
 reload: ## Recarrega as APIs sem reiniciar o Gateway
 	@echo "=== Hot reload das APIs ==="

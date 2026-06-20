@@ -56,18 +56,26 @@ make delete-dynamic
 O laboratório inclui um cenário completo de Client Credentials:
 
 ```text
-Cliente → chave Tyk → Tyk → Token Broker → API protegida
-                                  │
-                                  └→ Keycloak
+Cliente → chave Tyk → Tyk + plugin Go → API protegida
+                              │
+                              └→ Token Broker → Keycloak
 ```
 
-O Keycloak emite access tokens de 30 segundos. O broker guarda o token em
-memória, renova-o quando necessário e nunca expõe `client_secret` ou Bearer
-token ao cliente. A API externa valida criptograficamente o JWT pelo JWKS.
+O Keycloak emite access tokens de 30 segundos. O broker guarda as credenciais
+OAuth e emite tokens para o plugin. O plugin mantém cache local, resolve
+`tenant + serviço + ação`, injeta o Bearer token e chama diretamente a API
+externa. A API externa valida criptograficamente o JWT pelo JWKS.
 
 ```sh
 make oauth-upstream
 make oauth-token-cache
+make plugin-denied
+```
+
+O plugin é compilado para a versão e arquitetura exatas do Gateway:
+
+```sh
+make plugin-build
 ```
 
 O console administrativo do Keycloak fica em `http://localhost:8081`, com
