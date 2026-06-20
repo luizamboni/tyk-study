@@ -149,20 +149,10 @@ make integration-httpbin DEMO_KEY=outra-chave
 ```
 
 Para alterar credenciais, edite `oauth/token-broker/catalog.json` e
-recarregue:
+recarregue sem restart:
 
 ```sh
-docker compose exec token-broker node -e "
-  const http = require('http');
-  const req = http.request('http://localhost:3000/internal/v1/reload',
-    { method:'POST' }, res => {
-      let b = '';
-      res.on('data', c => b += c);
-      res.on('end', () => console.log(b));
-    });
-  req.write('{}');
-  req.end();
-"
+curl -s -X POST http://localhost:3002/internal/v1/reload | jq '.'
 ```
 
 Este ambiente e didatico: nao reutilize as credenciais em producao.

@@ -42,6 +42,8 @@ services:
   token-broker:
     image: node:22-alpine
     command: node /app/server.mjs
+    ports:
+      - "127.0.0.1:3002:3000"
     environment:
       PORT: 3000
     depends_on:
